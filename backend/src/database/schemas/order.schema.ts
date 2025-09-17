@@ -3,14 +3,14 @@ import { Document, Types } from 'mongoose';
 
 export type OrderDocument = Order & Document;
 
-@Schema({ 
+@Schema({
   collection: 'orders',
   timestamps: true,
 })
 export class Order {
   _id: Types.ObjectId;
 
-  @Prop({ required: true, index: true })
+  @Prop({ required: true, index: true })  // Index is declared here, no need for manual schema.index
   school_id: string;
 
   @Prop({ required: true })
@@ -42,7 +42,6 @@ export class Order {
 
 export const OrderSchema = SchemaFactory.createForClass(Order);
 
-// Create indexes
-OrderSchema.index({ school_id: 1 });
-OrderSchema.index({ _id: 1 });
-OrderSchema.index({ createdAt: -1 });
+// Remove duplicate index definitions
+// OrderSchema.index({ _id: 1 }); // REMOVE this line, it's unnecessary
+OrderSchema.index({ createdAt: -1 });  // This one is fine for sorting orders by createdAt

@@ -26,5 +26,5 @@ export class User {
 
 export const UserSchema = SchemaFactory.createForClass(User);
 
-// Create indexes
-UserSchema.index({ username: 1 }, { unique: true });
+// Remove the manual index declaration for 'username'
+// UserSchema.index({ username: 1 }, { unique: true }); // REMOVE THIS LINE

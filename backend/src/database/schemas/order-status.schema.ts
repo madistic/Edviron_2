@@ -52,8 +52,8 @@ export class OrderStatus {
 
 export const OrderStatusSchema = SchemaFactory.createForClass(OrderStatus);
 
-// Create indexes
-OrderStatusSchema.index({ collect_id: 1 });
-OrderStatusSchema.index({ status: 1 });
-OrderStatusSchema.index({ payment_time: -1 });
-OrderStatusSchema.index({ transaction_amount: 1 });
+// Remove the redundant index definitions
+// OrderStatusSchema.index({ collect_id: 1 });  // REMOVE
+// OrderStatusSchema.index({ status: 1 });      // REMOVE
+// OrderStatusSchema.index({ payment_time: -1 }); // REMOVE
+// OrderStatusSchema.index({ transaction_amount: 1 }); // REMOVE

@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { Model, Types, PipelineStage } from 'mongoose';
 
 import { Order, OrderDocument } from '../database/schemas/order.schema';
 import { OrderStatus, OrderStatusDocument } from '../database/schemas/order-status.schema';
@@ -15,37 +15,22 @@ export class OrdersService {
     @InjectModel(OrderStatus.name) private orderStatusModel: Model<OrderStatusDocument>,
   ) {}
 
-  async getTransactions(paginationDto: PaginationDto) {
-    const {
-      page = 1,
-      limit = 10,
-      sort = 'createdAt',
-      order = 'desc',
-      status,
-      school_id,
-      gateway,
-    } = paginationDto;
-
-    const skip = (page - 1) * limit;
-    const sortOrder = order === 'desc' ? -1 : 1;
-
-    // Build match conditions
+  private buildMatchConditions(paginationDto: PaginationDto) {
+    const { status, school_id, gateway } = paginationDto;
     const matchConditions: any = {};
-    
-    if (status) {
-      matchConditions['orderStatus.status'] = status;
-    }
-    
-    if (school_id) {
-      matchConditions['school_id'] = school_id;
-    }
-    
-    if (gateway) {
-      matchConditions['gateway_name'] = gateway;
-    }
 
-    // Aggregation pipeline
-    const pipeline = [
+    if (status) matchConditions['orderStatus.status'] = status;
+    if (school_id) matchConditions['school_id'] = school_id;
+    if (gateway) matchConditions['gateway_name'] = gateway;
+
+    return matchConditions;
+  }
+
+  // Explicitly typing the aggregation pipeline
+  private buildPipeline(paginationDto: PaginationDto, skip: number, sortOrder: 1 | -1): PipelineStage[] {
+    const matchConditions = this.buildMatchConditions(paginationDto);
+  
+    return [
       {
         $lookup: {
           from: 'orderstatuses',
@@ -64,7 +49,9 @@ export class OrdersService {
         $match: Object.keys(matchConditions).length > 0 ? matchConditions : {},
       },
       {
-        $sort: { [sort === 'payment_time' ? 'orderStatus.payment_time' : sort]: sortOrder },
+        $sort: {
+          [paginationDto.sort === 'payment_time' ? 'orderStatus.payment_time' : paginationDto.sort]: sortOrder,
+        },
       },
       {
         $project: {
@@ -83,18 +70,27 @@ export class OrdersService {
         },
       },
     ];
-
+  }
+  
+  async getTransactions(paginationDto: PaginationDto) {
+    const { page = 1, limit = 10, sort = 'createdAt', order = 'desc' } = paginationDto;
+    const skip = (page - 1) * limit;
+    const sortOrder: 1 | -1 = order === 'desc' ? -1 : 1;  // Ensure this is typed as 1 or -1
+  
+    const pipeline = this.buildPipeline(paginationDto, skip, sortOrder);
+  
     const countPipeline = [...pipeline, { $count: 'total' }];
     const dataPipeline = [...pipeline, { $skip: skip }, { $limit: limit }];
-
+  
+    // Execute both count and data pipelines in parallel
     const [countResult, data] = await Promise.all([
       this.orderModel.aggregate(countPipeline),
       this.orderModel.aggregate(dataPipeline),
     ]);
-
+  
     const total = countResult[0]?.total || 0;
     const totalPages = Math.ceil(total / limit);
-
+  
     return {
       data,
       pagination: {
@@ -118,11 +114,9 @@ export class OrdersService {
   async getTransactionStatus(customOrderId: string) {
     try {
       const objectId = new Types.ObjectId(customOrderId);
-      
+
       const result = await this.orderModel.aggregate([
-        {
-          $match: { _id: objectId },
-        },
+        { $match: { _id: objectId } },
         {
           $lookup: {
             from: 'orderstatuses',
@@ -158,7 +152,7 @@ export class OrdersService {
 
       return result[0] || null;
     } catch (error) {
-      this.logger.error(`Error getting transaction status: ${error.message}`);
+      this.logger.error(`Error getting transaction status for order ID: ${customOrderId} - ${error.message}`, error.stack);
       return null;
     }
   }
@@ -182,8 +176,8 @@ export class OrdersService {
   }
 
   async findOrderStatusByCollectId(collectId: string) {
-    return this.orderStatusModel.findOne({ 
-      collect_id: new Types.ObjectId(collectId) 
+    return this.orderStatusModel.findOne({
+      collect_id: new Types.ObjectId(collectId),
     });
   }
 }

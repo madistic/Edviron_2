@@ -17,20 +17,24 @@ import { DatabaseModule } from './database/database.module';
       envFilePath: '.env',
     }),
     MongooseModule.forRootAsync({
-      useFactory: async (configService: ConfigService) => ({
-        uri: configService.get<string>('MONGO_URI'),
-      }),
+      useFactory: async (configService: ConfigService) => {
+        const mongoUri = configService.get<string>('MONGO_URI');
+        console.log('Mongo URI:', mongoUri);  // Log to check the URI
+        return { uri: mongoUri };
+      },
       inject: [ConfigService],
     }),
     PassportModule,
     JwtModule.registerAsync({
       global: true,
-      useFactory: async (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET'),
-        signOptions: { 
-          expiresIn: configService.get<string>('JWT_EXPIRY', '1h') 
-        },
-      }),
+      useFactory: async (configService: ConfigService) => {
+        const jwtSecret = configService.get<string>('JWT_SECRET');
+        console.log('Loaded JWT Secret:', jwtSecret);  // Verify the JWT secret
+        return {
+          secret: jwtSecret,
+          signOptions: { expiresIn: configService.get<string>('JWT_EXPIRY', '1h') },
+        };
+      },
       inject: [ConfigService],
     }),
     DatabaseModule,
